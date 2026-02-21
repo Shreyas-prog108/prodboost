@@ -29,7 +29,7 @@ class SourceResponse(SourceCreate):
 # Note Schemas
 class NoteCreate(BaseModel):
     content: str
-    tags: dict | None = None
+    tags: list | dict | None = None
     linked_source_id: str | None = None
 
 class NoteResponse(NoteCreate):
