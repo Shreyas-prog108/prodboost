@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Environment & secrets
+.env
+
+# Database
+*.db
+*.sqlite3
+
+# Redis dump
+dump.rdb
+
+# Logs
+*.log
+fastapi.log
+
+# Alembic unused revisions
+migrations/versions/__pycache__/
+
+# OS
+.DS_Store
