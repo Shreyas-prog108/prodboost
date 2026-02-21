@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -29,16 +29,22 @@ async def summarize_meeting(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Ensure meeting exists
+    # Ensure meeting exists and belongs to the current user
     meeting = await get_meeting_session_service(id, db)
-    
+
+    if meeting.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to summarize this meeting"
+        )
+
     # Enqueue background summary task to Redis list queue
     job_id = await enqueue_job(
         queue_name="queue:meetings",
         job_name="process_summarize_meeting",
         payload={"meeting_id": id}
     )
-    
+
     return APIResponse(data={
         "message": "Meeting summarization job enqueued via Redis.",
         "meeting_id": id,
@@ -52,6 +58,12 @@ async def get_meeting(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Assume auth middleware verifies ownership.
     meeting = await get_meeting_session_service(id, db)
+
+    if meeting.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this meeting"
+        )
+
     return APIResponse(data=meeting)

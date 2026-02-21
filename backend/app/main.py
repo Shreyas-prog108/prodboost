@@ -28,7 +28,13 @@ async def lifespan(app: FastAPI):
     # Startup: Kick off the Redis background worker loop
     task = asyncio.create_task(worker_loop())
     yield
-    # Shutdown logic goes here
+    # Shutdown: cancel and await the Redis background worker loop
+    if not task.done():
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
 app = FastAPI(
     title="ProdBoost API",

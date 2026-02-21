@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User
+from app.models.research import ResearchProject
 
 from app.schemas.research import (
     ProjectCreate, ProjectResponse,
@@ -19,6 +21,24 @@ from app.modules.research.service import (
 from app.jobs.queue import enqueue_job
 
 router = APIRouter(prefix="/research", tags=["research"])
+
+
+async def _get_project_and_verify_owner(project_id: str, user_id: str, db: AsyncSession) -> ResearchProject:
+    """Fetch a research project and enforce ownership, raising 403 if not owned by user."""
+    stmt = select(ResearchProject).where(ResearchProject.id == project_id)
+    result = await db.execute(stmt)
+    project = result.scalar_one_or_none()
+
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Research project not found")
+
+    if project.user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to modify this research project"
+        )
+
+    return project
 
 
 @router.post("/projects", response_model=APIResponse[ProjectResponse])
@@ -47,7 +67,7 @@ async def add_source(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # In a full app, check if the current user actually owns project `id`
+    await _get_project_and_verify_owner(id, current_user.id, db)
     source = await add_source_to_project_service(id, source_in, db)
     return APIResponse(data=source)
 
@@ -59,7 +79,7 @@ async def add_note(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # In a full app, check if the current user actually owns project `id`
+    await _get_project_and_verify_owner(id, current_user.id, db)
     note = await add_note_to_project_service(id, note_in, db)
     return APIResponse(data=note)
 
@@ -70,10 +90,13 @@ async def request_generate_draft(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # 1. Fetch context to embed in the queued payload
+    # Verify ownership before enqueueing the AI job
+    await _get_project_and_verify_owner(id, current_user.id, db)
+
+    # Fetch context to embed in the queued payload
     project_context = await get_project_context(id, db)
-    
-    # 2. Push job to Redis queue (serverless-compliant, no in-memory execution)
+
+    # Push job to Redis queue (serverless-compliant, no in-memory execution)
     job_id = await enqueue_job(
         queue_name="queue:research",
         job_name="process_generate_draft",
@@ -82,7 +105,7 @@ async def request_generate_draft(
             "context": project_context
         }
     )
-    
+
     return APIResponse(data={
         "message": "Draft generation job enqueued.",
         "project_id": id,

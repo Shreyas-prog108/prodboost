@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from passlib.context import CryptContext
 from jwt import encode, decode, PyJWTError
@@ -31,7 +31,7 @@ def get_password_hash(password: str) -> str:
 
 
 def create_access_token(subject: str | Any, role: str) -> str:
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode = {"exp": expire, "sub": str(subject), "role": role}
     encoded_jwt = encode(to_encode, settings.JWT_SECRET, algorithm=ALGORITHM)
     return encoded_jwt
@@ -78,6 +78,10 @@ def _get_fernet() -> Fernet:
 def encrypt_token(token: str) -> str:
     """Encrypts a plaintext string (e.g. an OAuth access token) symmetrically."""
     if not token:
+        import logging
+        logging.getLogger(__name__).warning(
+            "encrypt_token called with an empty token value — this may indicate a bug in the caller."
+        )
         return ""
     fernet = _get_fernet()
     encrypted_bytes = fernet.encrypt(token.encode())
@@ -86,6 +90,10 @@ def encrypt_token(token: str) -> str:
 def decrypt_token(encrypted_token: str) -> str:
     """Decrypts strings previously encrypted via encrypt_token."""
     if not encrypted_token:
+        import logging
+        logging.getLogger(__name__).warning(
+            "decrypt_token called with an empty encrypted_token — this may indicate a bug in the caller."
+        )
         return ""
     fernet = _get_fernet()
     decrypted_bytes = fernet.decrypt(encrypted_token.encode())

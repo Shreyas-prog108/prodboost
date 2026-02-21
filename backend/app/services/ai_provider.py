@@ -104,8 +104,13 @@ Transcript:
         try:
             return json.loads(content)
         except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse Kimi output as JSON: {content}")
-            return {"decisions": [], "questions": [], "tasks": []}
+            logger.error(
+                f"Failed to parse Kimi output as JSON. Raw response: {content!r}",
+                exc_info=True
+            )
+            raise ValueError(
+                f"AI provider returned malformed JSON that could not be parsed: {e}"
+            ) from e
 
     async def generate_draft(self, context: Dict[str, Any]) -> str:
         prompt = f"Write a comprehensive research draft utilizing the following project context:\n\n{json.dumps(context, indent=2)}"

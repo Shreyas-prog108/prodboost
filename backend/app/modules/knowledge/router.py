@@ -50,7 +50,11 @@ async def update_knowledge(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Update a knowledge article. Automatically increments the internal version tracking number if there are changes."""
+    """Update a knowledge article. Automatically increments the internal version tracking number if there are changes.
+
+    NOTE: Full team-membership authorization requires a TeamMember join table (not yet in schema).
+    The service layer enforces 404 if the entry does not exist; access is gated by JWT authentication.
+    """
     entry = await update_knowledge_service(id, entry_in, db)
     return APIResponse(data=entry)
 

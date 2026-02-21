@@ -1,4 +1,5 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
+from typing import Annotated
 from datetime import datetime
 from uuid import UUID
 
@@ -9,11 +10,11 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    password: str
+    password: Annotated[str, Field(min_length=8, description="Password must be at least 8 characters long")]
 
 
 class UserLogin(UserBase):
-    password: str
+    password: Annotated[str, Field(min_length=8, description="Password must be at least 8 characters long")]
 
 
 class UserResponse(UserBase):
