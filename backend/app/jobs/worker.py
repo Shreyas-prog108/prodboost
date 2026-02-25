@@ -91,8 +91,8 @@ async def worker_loop():
                         job_log.status = JobStatus.PENDING
                         await db.commit()
                         logger.warning(f"Re-queueing Job {job_id} (Attempt {job_log.retries_count}/3)")
-                        # Push back into redis
-                        await redis_client.lpush(queue_name, msg_str) 
+                        # Push back to the tail of the queue to preserve FIFO order (BLPOP reads from head)
+                        await redis_client.rpush(queue_name, msg_str) 
                     else:
                         job_log.status = JobStatus.FAILED
                         await db.commit()

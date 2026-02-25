@@ -19,8 +19,8 @@ class AutomationRule(Base):
     user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)
     trigger_type: Mapped[TriggerType] = mapped_column(Enum(TriggerType), nullable=False)
     # The condition block. E.g., {"keyword": "urgent"}, or {"source": "sales_call"}
-    condition_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    condition_json: Mapped[dict] = mapped_column(JSON, default=lambda: {}, nullable=False)
     # The action logic to execute. E.g., {"type": "CREATE_TASK", "assignee": "me"}
-    action_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    action_json: Mapped[dict] = mapped_column(JSON, default=lambda: {}, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.utcnow(), nullable=False)

@@ -1,4 +1,5 @@
 from upstash_redis import Redis
+import logging
 from fastapi import HTTPException, status
 from app.core.config import settings
 
@@ -27,6 +28,9 @@ def check_rate_limit(key: str, limit: int = 5, window: int = 60):
     except HTTPException:
         raise
     except Exception as e:
-        # In case Redis fails, we might want to allow the request to pass
-        # or log the error. For now, we just pass.
-        pass
+        # Log the Redis error so it is visible in monitoring.
+        # We allow the request to pass rather than blocking users during Redis outages,
+        # but this should be investigated if it occurs frequently.
+        logging.getLogger(__name__).error(
+            f"Rate limit check failed (Redis error) for key '{key}': {e}"
+        )
