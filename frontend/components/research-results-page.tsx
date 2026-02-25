@@ -1,19 +1,8 @@
 "use client"
 
-import { useState } from "react"
-import { Search, Download, Share2, ExternalLink, TrendingUp, Clock } from "lucide-react"
-
-interface ResearchResult {
-  id: string
-  title: string
-  source: string
-  relevance: number
-  date: string
-  summary: string
-  url: string
-  type: "article" | "report" | "whitepaper" | "news"
-  tags: string[]
-}
+import { useState, useEffect } from "react"
+import { Search, Download, Share2, ExternalLink, TrendingUp, Clock, Plus, X } from "lucide-react"
+import { researchApi, type ResearchProject } from "@/lib/api"
 
 interface KnowledgeNode {
   id: string
@@ -24,176 +13,226 @@ interface KnowledgeNode {
   description: string
 }
 
+const DEFAULT_KNOWLEDGE_GRAPH: KnowledgeNode[] = [
+  {
+    id: "1",
+    name: "Executive AI",
+    type: "concept",
+    importance: 10,
+    connections: ["2", "3", "4"],
+    description: "AI systems designed for executive decision support and workflow optimization",
+  },
+  {
+    id: "2",
+    name: "Decision Making",
+    type: "concept",
+    importance: 9,
+    connections: ["1", "5", "6"],
+    description: "Strategic and tactical decisions made by business leaders",
+  },
+  {
+    id: "3",
+    name: "Productivity",
+    type: "concept",
+    importance: 8,
+    connections: ["1", "7", "8"],
+    description: "Efficiency and output of executive work",
+  },
+  {
+    id: "4",
+    name: "Automation",
+    type: "concept",
+    importance: 8,
+    connections: ["1", "3", "9"],
+    description: "Automated handling of routine tasks",
+  },
+  {
+    id: "5",
+    name: "Strategy",
+    type: "concept",
+    importance: 9,
+    connections: ["2", "10"],
+    description: "Long-term business planning and direction",
+  },
+]
+
 export function ResearchResultsPage() {
-  const [searchQuery, setSearchQuery] = useState("AI in Executive Leadership")
-  const [filterType, setFilterType] = useState("all")
-  const [sortBy, setSortBy] = useState("relevance")
+  // ── Projects state ────────────────────────────────────────────────────────
+  const [projects, setProjects] = useState<ResearchProject[]>([])
+  const [isLoadingProjects, setIsLoadingProjects] = useState(true)
+  const [projectsError, setProjectsError] = useState<string | null>(null)
+  const [selectedProject, setSelectedProject] = useState<ResearchProject | null>(null)
 
-  const researchResults: ResearchResult[] = [
-    {
-      id: "1",
-      title: "The Future of AI-Powered Executive Dashboards: Insights from Fortune 500 Leaders",
-      source: "Harvard Business Review",
-      relevance: 98,
-      date: "2 days ago",
-      summary:
-        "A comprehensive study on how executives are leveraging AI to make better decisions faster. Key findings include 67% productivity increase and improved decision-making speed.",
-      url: "#",
-      type: "article",
-      tags: ["AI", "Executive", "Productivity", "Decision Making"],
-    },
-    {
-      id: "2",
-      title: "Enterprise AI Implementation: Best Practices Report 2024",
-      source: "Gartner Research",
-      relevance: 95,
-      date: "1 week ago",
-      summary:
-        "An in-depth analysis of enterprise AI adoption trends, implementation strategies, and ROI metrics. Highlights the importance of executive buy-in and change management.",
-      url: "#",
-      type: "report",
-      tags: ["Enterprise AI", "Implementation", "ROI", "Best Practices"],
-    },
-    {
-      id: "3",
-      title: "Intelligent Automation: Reshaping the Executive Workflow",
-      source: "McKinsey & Company",
-      relevance: 92,
-      date: "2 weeks ago",
-      summary:
-        "Explores how intelligent automation can transform executive workflows, reducing administrative burden by up to 40% and freeing time for strategic decisions.",
-      url: "#",
-      type: "whitepaper",
-      tags: ["Automation", "Workflow", "Efficiency", "Strategic Planning"],
-    },
-    {
-      id: "4",
-      title: "AI-Driven Decision Making: New Era of Executive Leadership",
-      source: "Forbes",
-      relevance: 88,
-      date: "3 days ago",
-      summary:
-        "News coverage of how leading executives are using AI assistants to handle routine tasks and focus on high-impact strategic decisions.",
-      url: "#",
-      type: "news",
-      tags: ["AI", "Leadership", "Strategy", "Decision Making"],
-    },
-    {
-      id: "5",
-      title: "The Business Value of Intelligent Executive Assistants",
-      source: "Deloitte Insights",
-      relevance: 85,
-      date: "1 month ago",
-      summary:
-        "Quantifies the business impact of AI-powered executive assistants including time savings, improved focus, and better outcomes in key initiatives.",
-      url: "#",
-      type: "report",
-      tags: ["Executive Assistants", "AI", "Business Value", "ROI"],
-    },
-  ]
+  // ── New project form ──────────────────────────────────────────────────────
+  const [showNewProject, setShowNewProject] = useState(false)
+  const [newProjectTitle, setNewProjectTitle] = useState("")
+  const [newProjectDesc, setNewProjectDesc] = useState("")
+  const [isCreating, setIsCreating] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
 
-  const knowledgeGraph: KnowledgeNode[] = [
-    {
-      id: "1",
-      name: "Executive AI",
-      type: "concept",
-      importance: 10,
-      connections: ["2", "3", "4"],
-      description: "AI systems designed for executive decision support and workflow optimization",
-    },
-    {
-      id: "2",
-      name: "Decision Making",
-      type: "concept",
-      importance: 9,
-      connections: ["1", "5", "6"],
-      description: "Strategic and tactical decisions made by business leaders",
-    },
-    {
-      id: "3",
-      name: "Productivity",
-      type: "concept",
-      importance: 8,
-      connections: ["1", "7", "8"],
-      description: "Efficiency and output of executive work",
-    },
-    {
-      id: "4",
-      name: "Automation",
-      type: "concept",
-      importance: 8,
-      connections: ["1", "3", "9"],
-      description: "Automated handling of routine tasks",
-    },
-    {
-      id: "5",
-      name: "Strategy",
-      type: "concept",
-      importance: 9,
-      connections: ["2", "10"],
-      description: "Long-term business planning and direction",
-    },
-    {
-      id: "6",
-      name: "Analytics",
-      type: "concept",
-      importance: 7,
-      connections: ["2", "5"],
-      description: "Data analysis for insights and reporting",
-    },
-    {
-      id: "7",
-      name: "Email Management",
-      type: "concept",
-      importance: 6,
-      connections: ["3", "4"],
-      description: "Email organization and prioritization",
-    },
-    {
-      id: "8",
-      name: "Calendar Optimization",
-      type: "concept",
-      importance: 6,
-      connections: ["3", "9"],
-      description: "Meeting scheduling and time management",
-    },
-    {
-      id: "9",
-      name: "Focus Time",
-      type: "concept",
-      importance: 7,
-      connections: ["4", "8"],
-      description: "Uninterrupted time for deep work",
-    },
-    {
-      id: "10",
-      name: "Enterprise Implementation",
-      type: "concept",
-      importance: 8,
-      connections: ["5", "1"],
-      description: "Deploying AI across the organization",
-    },
-  ]
+  // ── Add source form ───────────────────────────────────────────────────────
+  const [showAddSource, setShowAddSource] = useState(false)
+  const [sourceUrl, setSourceUrl] = useState("")
+  const [sourceTitle, setSourceTitle] = useState("")
+  const [isAddingSource, setIsAddingSource] = useState(false)
+  const [sourceMsg, setSourceMsg] = useState<string | null>(null)
 
-  const filteredResults = researchResults.filter((result) => {
-    if (filterType === "all") return true
-    return result.type === filterType
-  })
+  // ── Generate draft ────────────────────────────────────────────────────────
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [generateMsg, setGenerateMsg] = useState<string | null>(null)
 
-  const sortedResults = [...filteredResults].sort((a, b) => {
-    if (sortBy === "relevance") return b.relevance - a.relevance
-    if (sortBy === "date") return new Date(b.date).getTime() - new Date(a.date).getTime()
-    return 0
-  })
+  // ── Search/filter (local) ─────────────────────────────────────────────────
+  const [searchQuery, setSearchQuery] = useState("")
+
+  useEffect(() => {
+    fetchProjects()
+  }, [])
+
+  const fetchProjects = async () => {
+    setIsLoadingProjects(true)
+    setProjectsError(null)
+    try {
+      const response = await researchApi.listProjects()
+      if (response.success) {
+        setProjects(response.data)
+        if (response.data.length > 0 && !selectedProject) {
+          setSelectedProject(response.data[0])
+        }
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to load research projects"
+      setProjectsError(message)
+    } finally {
+      setIsLoadingProjects(false)
+    }
+  }
+
+  const createProject = async () => {
+    if (!newProjectTitle.trim()) return
+    setIsCreating(true)
+    setCreateError(null)
+    try {
+      const response = await researchApi.createProject({
+        title: newProjectTitle.trim(),
+        description: newProjectDesc.trim() || undefined,
+      })
+      if (response.success) {
+        setProjects((prev) => [response.data, ...prev])
+        setSelectedProject(response.data)
+        setNewProjectTitle("")
+        setNewProjectDesc("")
+        setShowNewProject(false)
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to create project"
+      setCreateError(message)
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
+  const addSource = async () => {
+    if (!selectedProject || !sourceUrl.trim()) return
+    setIsAddingSource(true)
+    setSourceMsg(null)
+    try {
+      await researchApi.addSource(selectedProject.id, {
+        url: sourceUrl.trim(),
+        title: sourceTitle.trim() || undefined,
+      })
+      setSourceMsg("Source added successfully.")
+      setSourceUrl("")
+      setSourceTitle("")
+      setShowAddSource(false)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to add source"
+      setSourceMsg(message)
+    } finally {
+      setIsAddingSource(false)
+    }
+  }
+
+  const generateDraft = async () => {
+    if (!selectedProject) return
+    setIsGenerating(true)
+    setGenerateMsg(null)
+    try {
+      const response = await researchApi.generateDraft(selectedProject.id)
+      if (response.success) {
+        setGenerateMsg(`Draft generation queued (Job ID: ${response.data.job_id})`)
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to queue draft generation"
+      setGenerateMsg(message)
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  const filteredProjects = projects.filter((p) =>
+    p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (p.description ?? "").toLowerCase().includes(searchQuery.toLowerCase())
+  )
 
   return (
     <div className="w-full min-h-screen bg-gradient-to-br from-slate-950 via-purple-950/50 to-slate-950 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-4xl font-bold text-foreground mb-2">Research Results</h1>
-          <p className="text-muted-foreground">AI-curated insights and knowledge connections for your research</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-4xl font-bold text-foreground mb-2">Research Projects</h1>
+            <p className="text-muted-foreground">Manage research projects, add sources, and generate AI drafts</p>
+          </div>
+          <button
+            onClick={() => setShowNewProject((v) => !v)}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-cyan-500 hover:from-purple-600 hover:to-cyan-600 rounded-lg text-white font-medium transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            New Project
+          </button>
         </div>
+
+        {/* New Project Form */}
+        {showNewProject && (
+          <div className="glass rounded-lg p-6 border border-purple-500/30 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-foreground">New Research Project</h2>
+              <button onClick={() => setShowNewProject(false)} className="p-1 hover:bg-white/10 rounded-lg transition-colors">
+                <X className="w-5 h-5 text-muted-foreground" />
+              </button>
+            </div>
+            {createError && (
+              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-sm">{createError}</div>
+            )}
+            <div>
+              <label className="text-sm text-muted-foreground block mb-1">Title</label>
+              <input
+                type="text"
+                value={newProjectTitle}
+                onChange={(e) => setNewProjectTitle(e.target.value)}
+                placeholder="e.g. AI in Executive Leadership"
+                className="w-full px-3 py-2 glass rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground block mb-1">Description (optional)</label>
+              <textarea
+                value={newProjectDesc}
+                onChange={(e) => setNewProjectDesc(e.target.value)}
+                placeholder="Brief description of the research topic..."
+                rows={3}
+                className="w-full px-3 py-2 glass rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-sm resize-none"
+              />
+            </div>
+            <button
+              onClick={createProject}
+              disabled={isCreating || !newProjectTitle.trim()}
+              className="px-6 py-2 bg-gradient-to-r from-purple-500 to-cyan-500 hover:from-purple-600 hover:to-cyan-600 rounded-lg text-white font-medium transition-all disabled:opacity-50"
+            >
+              {isCreating ? "Creating..." : "Create Project"}
+            </button>
+          </div>
+        )}
 
         {/* Search Bar */}
         <div className="glass rounded-lg p-4">
@@ -205,104 +244,82 @@ export function ResearchResultsPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-12 pr-4 py-2 glass rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                placeholder="Search research topics..."
+                placeholder="Search research projects..."
               />
             </div>
-            <button className="px-6 py-2 bg-gradient-to-r from-purple-500 to-cyan-500 hover:from-purple-600 hover:to-cyan-600 rounded-lg text-white font-medium transition-all">
-              Search
-            </button>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Research Results */}
+          {/* Projects List */}
           <div className="lg:col-span-2 space-y-4">
-            {/* Filter and Sort */}
-            <div className="glass rounded-lg p-4 flex gap-4 flex-wrap">
-              <div>
-                <label className="text-sm text-muted-foreground block mb-2">Type</label>
-                <select
-                  value={filterType}
-                  onChange={(e) => setFilterType(e.target.value)}
-                  className="glass px-3 py-2 rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                >
-                  <option value="all">All Types</option>
-                  <option value="article">Articles</option>
-                  <option value="report">Reports</option>
-                  <option value="whitepaper">Whitepapers</option>
-                  <option value="news">News</option>
-                </select>
+            {/* Loading / Error */}
+            {isLoadingProjects && (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-24 glass rounded-lg animate-pulse" />
+                ))}
               </div>
-              <div>
-                <label className="text-sm text-muted-foreground block mb-2">Sort By</label>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="glass px-3 py-2 rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                >
-                  <option value="relevance">Relevance</option>
-                  <option value="date">Most Recent</option>
-                </select>
+            )}
+            {projectsError && (
+              <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-sm">
+                {projectsError}
+                <button onClick={fetchProjects} className="ml-2 underline">Retry</button>
               </div>
-            </div>
+            )}
 
-            {/* Results List */}
-            <div className="space-y-4">
-              {sortedResults.map((result) => (
+            {/* Empty state */}
+            {!isLoadingProjects && !projectsError && filteredProjects.length === 0 && (
+              <div className="glass rounded-lg p-8 border border-white/10 text-center">
+                <p className="text-muted-foreground">
+                  {projects.length === 0
+                    ? "No research projects yet. Create your first project above."
+                    : "No projects match your search."}
+                </p>
+              </div>
+            )}
+
+            {/* Project cards */}
+            {!isLoadingProjects &&
+              filteredProjects.map((project) => (
                 <div
-                  key={result.id}
-                  className="glass rounded-lg p-5 border border-white/10 hover:bg-white/5 transition-colors"
+                  key={project.id}
+                  onClick={() => setSelectedProject(project)}
+                  className={`glass rounded-lg p-5 border transition-colors cursor-pointer ${
+                    selectedProject?.id === project.id
+                      ? "border-purple-500/50 bg-purple-500/10"
+                      : "border-white/10 hover:bg-white/5"
+                  }`}
                 >
                   <div className="flex items-start justify-between gap-4 mb-3">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="text-lg font-semibold text-foreground hover:text-cyan-400 cursor-pointer transition-colors">
-                          {result.title}
-                        </h3>
-                        <span className="text-xs px-2 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 capitalize">
-                          {result.type}
-                        </span>
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-3">{result.source}</p>
-                      <p className="text-foreground mb-3">{result.summary}</p>
-
-                      {/* Tags */}
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        {result.tags.map((tag) => (
-                          <span
-                            key={tag}
-                            className="text-xs px-2 py-1 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Relevance Score */}
-                    <div className="text-right flex-shrink-0">
-                      <div className="text-2xl font-bold text-cyan-400">{result.relevance}%</div>
-                      <p className="text-xs text-muted-foreground">Relevance</p>
+                      <h3 className="text-lg font-semibold text-foreground mb-1">{project.title}</h3>
+                      {project.description && (
+                        <p className="text-sm text-muted-foreground mb-2">{project.description}</p>
+                      )}
                     </div>
                   </div>
-
-                  {/* Actions */}
                   <div className="flex items-center justify-between pt-3 border-t border-white/10">
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Clock className="w-3 h-3" />
-                      {result.date}
+                      {new Date(project.created_at).toLocaleDateString()}
                     </div>
                     <div className="flex gap-2">
-                      <button className="p-2 hover:bg-white/10 rounded-lg transition-colors text-muted-foreground hover:text-foreground">
-                        <Share2 className="w-4 h-4" />
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setSelectedProject(project); setShowAddSource(true) }}
+                        className="p-2 hover:bg-white/10 rounded-lg transition-colors text-muted-foreground hover:text-foreground text-xs px-3"
+                      >
+                        + Source
                       </button>
-                      <button className="p-2 hover:bg-white/10 rounded-lg transition-colors text-muted-foreground hover:text-foreground">
-                        <Download className="w-4 h-4" />
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setSelectedProject(project); generateDraft() }}
+                        disabled={isGenerating}
+                        className="p-2 hover:bg-white/10 rounded-lg transition-colors text-cyan-400 hover:text-cyan-300 text-xs px-3 disabled:opacity-50"
+                      >
+                        {isGenerating && selectedProject?.id === project.id ? "Queuing..." : "Generate Draft"}
                       </button>
                       <a
-                        href={result.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        href="#"
                         className="p-2 hover:bg-white/10 rounded-lg transition-colors text-cyan-400 hover:text-cyan-300"
                       >
                         <ExternalLink className="w-4 h-4" />
@@ -311,7 +328,57 @@ export function ResearchResultsPage() {
                   </div>
                 </div>
               ))}
-            </div>
+
+            {/* Status messages */}
+            {generateMsg && (
+              <div className="p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-sm">
+                {generateMsg}
+              </div>
+            )}
+            {sourceMsg && (
+              <div className="p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-sm">
+                {sourceMsg}
+              </div>
+            )}
+
+            {/* Add Source Form */}
+            {showAddSource && selectedProject && (
+              <div className="glass rounded-lg p-5 border border-cyan-500/30 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-foreground">Add Source to: {selectedProject.title}</h3>
+                  <button onClick={() => setShowAddSource(false)} className="p-1 hover:bg-white/10 rounded-lg">
+                    <X className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground block mb-1">URL</label>
+                  <input
+                    type="url"
+                    value={sourceUrl}
+                    onChange={(e) => setSourceUrl(e.target.value)}
+                    placeholder="https://..."
+                    className="w-full px-3 py-2 glass rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-cyan-500/50 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground block mb-1">Title (optional)</label>
+                  <input
+                    type="text"
+                    value={sourceTitle}
+                    onChange={(e) => setSourceTitle(e.target.value)}
+                    placeholder="Source title..."
+                    className="w-full px-3 py-2 glass rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-cyan-500/50 text-sm"
+                  />
+                </div>
+                <button
+                  onClick={addSource}
+                  disabled={isAddingSource || !sourceUrl.trim()}
+                  className="px-5 py-2 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-600 hover:to-purple-600 rounded-lg text-white font-medium text-sm transition-all disabled:opacity-50"
+                >
+                  {isAddingSource ? "Adding..." : "Add Source"}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Knowledge Graph Sidebar */}
@@ -320,50 +387,41 @@ export function ResearchResultsPage() {
               <TrendingUp className="w-5 h-5 text-cyan-400" />
               Knowledge Graph
             </h2>
-
             <p className="text-xs text-muted-foreground mb-4">Related concepts and their importance in your research</p>
 
             <div className="space-y-3 max-h-96 overflow-y-auto">
-              {knowledgeGraph
-                .sort((a, b) => b.importance - a.importance)
-                .slice(0, 8)
-                .map((node) => (
-                  <div
-                    key={node.id}
-                    className="p-3 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div>
-                        <p className="font-medium text-foreground text-sm">{node.name}</p>
-                        <p className="text-xs text-muted-foreground capitalize">{node.type}</p>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <div className="flex gap-0.5">
-                          {[...Array(node.importance)].map((_, i) => (
-                            <div key={i} className="w-1.5 h-1.5 rounded-full bg-cyan-400"></div>
-                          ))}
-                        </div>
-                      </div>
+              {DEFAULT_KNOWLEDGE_GRAPH.sort((a, b) => b.importance - a.importance).map((node) => (
+                <div
+                  key={node.id}
+                  className="p-3 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
+                >
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div>
+                      <p className="font-medium text-foreground text-sm">{node.name}</p>
+                      <p className="text-xs text-muted-foreground capitalize">{node.type}</p>
                     </div>
-                    <p className="text-xs text-muted-foreground">{node.description}</p>
-                    <div className="mt-2 flex gap-1 flex-wrap">
-                      {node.connections.slice(0, 2).map((connId) => {
-                        const conn = knowledgeGraph.find((n) => n.id === connId)
-                        return (
-                          <span
-                            key={connId}
-                            className="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30"
-                          >
-                            → {conn?.name}
-                          </span>
-                        )
-                      })}
-                      {node.connections.length > 2 && (
-                        <span className="text-xs text-muted-foreground">+{node.connections.length - 2} more</span>
-                      )}
+                    <div className="flex gap-0.5">
+                      {[...Array(Math.min(node.importance, 5))].map((_, i) => (
+                        <div key={i} className="w-1.5 h-1.5 rounded-full bg-cyan-400"></div>
+                      ))}
                     </div>
                   </div>
-                ))}
+                  <p className="text-xs text-muted-foreground">{node.description}</p>
+                  <div className="mt-2 flex gap-1 flex-wrap">
+                    {node.connections.slice(0, 2).map((connId) => {
+                      const conn = DEFAULT_KNOWLEDGE_GRAPH.find((n) => n.id === connId)
+                      return (
+                        <span
+                          key={connId}
+                          className="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30"
+                        >
+                          → {conn?.name}
+                        </span>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
 
             {/* Export Options */}

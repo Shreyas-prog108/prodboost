@@ -1,6 +1,6 @@
 import uuid
 import enum
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import String, Boolean, DateTime, ForeignKey, Enum, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -21,7 +21,7 @@ class Integration(Base):
     access_token: Mapped[str] = mapped_column(String, nullable=False) # Encrypted
     refresh_token: Mapped[str] = mapped_column(String, nullable=False) # Encrypted
     expiry: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.utcnow(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
 class OrchestrationEvent(Base):
     __tablename__ = "orchestration_events"
@@ -32,4 +32,5 @@ class OrchestrationEvent(Base):
     type: Mapped[str] = mapped_column(String, nullable=False)
     payload: Mapped[dict] = mapped_column(JSON, default=lambda: {}, nullable=False)
     processed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.utcnow(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+

@@ -2,6 +2,7 @@ import asyncio
 from fastapi import FastAPI, Request, Depends
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from contextlib import asynccontextmanager
@@ -43,6 +44,18 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# CORS: restrict to known frontend origin(s). Expand via ALLOWED_ORIGINS env var.
+_raw_origins = settings.ALLOWED_ORIGINS  # e.g. "http://localhost:3000,https://app.example.com"
+allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+)
+
 if settings.ENVIRONMENT == "production":
     app.add_middleware(HTTPSRedirectMiddleware)
 
@@ -66,9 +79,14 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    # Return only field names and messages — never raw internal Pydantic repr.
+    errors = [
+        {"field": ".".join(str(loc) for loc in err["loc"]), "message": err["msg"]}
+        for err in exc.errors()
+    ]
     return JSONResponse(
         status_code=422,
-        content={"success": False, "data": None, "error": str(exc)},
+        content={"success": False, "data": None, "error": "Validation failed", "details": errors},
     )
 
 @app.exception_handler(Exception)

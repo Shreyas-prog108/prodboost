@@ -12,6 +12,10 @@ def check_rate_limit(key: str, limit: int = 5, window: int = 60):
     """
     Basic rate limiting using Upstash Redis.
     Allows `limit` requests per `window` seconds.
+
+    Fail-closed: if Redis is unavailable, the request is rejected with 503
+    rather than silently allowed. This prevents an outage from removing all
+    rate-limit protection on auth endpoints.
     """
     try:
         current = redis_client.get(key)
@@ -28,9 +32,12 @@ def check_rate_limit(key: str, limit: int = 5, window: int = 60):
     except HTTPException:
         raise
     except Exception as e:
-        # Log the Redis error so it is visible in monitoring.
-        # We allow the request to pass rather than blocking users during Redis outages,
-        # but this should be investigated if it occurs frequently.
         logging.getLogger(__name__).error(
             f"Rate limit check failed (Redis error) for key '{key}': {e}"
+        )
+        # Fail closed: block the request when we cannot verify the rate limit.
+        # This prevents a Redis outage from silently disabling all auth protection.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service temporarily unavailable. Please try again shortly.",
         )

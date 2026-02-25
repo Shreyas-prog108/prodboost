@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.models.user import User
-from app.schemas.user import UserCreate
+from app.schemas.user import UserCreate, UserLogin
 from app.core.security import get_password_hash, verify_password, create_access_token
 
 
@@ -31,7 +31,7 @@ async def register_user_service(user_in: UserCreate, db: AsyncSession) -> User:
     return new_user
 
 
-async def authenticate_user_service(user_in: UserCreate, db: AsyncSession) -> tuple[str, User]:
+async def authenticate_user_service(user_in: UserLogin, db: AsyncSession) -> tuple[str, User]:
     stmt = select(User).where(User.email == user_in.email)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()

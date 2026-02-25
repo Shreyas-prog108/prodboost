@@ -3,9 +3,10 @@
 interface SidebarProps {
   activeTab: string
   setActiveTab: (tab: string) => void
+  onLogout?: () => void
 }
 
-export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
+export function Sidebar({ activeTab, setActiveTab, onLogout }: SidebarProps) {
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: "📊" },
     { id: "calendar", label: "Calendar", icon: "📅" },
@@ -13,6 +14,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
     { id: "email", label: "Email", icon: "✉️" },
     { id: "research", label: "Research", icon: "🔍" },
     { id: "analytics", label: "Analytics", icon: "📈" },
+    { id: "settings", label: "Settings", icon: "⚙️" },
   ]
 
   const stats = [
@@ -86,6 +88,14 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
             <span className="text-slate-400">2 pending items</span>
           </div>
         </div>
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            className="mt-4 w-full text-xs text-slate-500 hover:text-red-400 transition-colors text-left px-1"
+          >
+            Sign out
+          </button>
+        )}
       </div>
     </div>
   )

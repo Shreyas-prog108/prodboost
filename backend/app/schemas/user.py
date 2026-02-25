@@ -10,11 +10,21 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    password: Annotated[str, Field(min_length=8, description="Password must be at least 8 characters long")]
+    # Min 12 chars (NIST SP 800-63B), max 72 to avoid bcrypt silent truncation
+    password: Annotated[str, Field(
+        min_length=12,
+        max_length=72,
+        description="Password must be 12–72 characters long"
+    )]
 
 
 class UserLogin(UserBase):
-    password: Annotated[str, Field(min_length=8, description="Password must be at least 8 characters long")]
+    # Use the same bounds on login so error messages are consistent
+    password: Annotated[str, Field(
+        min_length=12,
+        max_length=72,
+        description="Password must be 12–72 characters long"
+    )]
 
 
 class UserResponse(UserBase):

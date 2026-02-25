@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str | None = None
     REDIS_URL: str = "redis://localhost:6379/0"
     ENVIRONMENT: str = "development"
+    # Comma-separated list of allowed CORS origins, e.g. "http://localhost:3000,https://app.example.com"
+    ALLOWED_ORIGINS: str = "http://localhost:3000"
     
     model_config = SettingsConfigDict(env_file=".env")
     

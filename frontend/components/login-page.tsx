@@ -6,6 +6,8 @@ import { useState } from "react"
 import { Mail, Lock, Chrome, LogIn } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { authApi } from "@/lib/api"
+import { markAuthenticated } from "@/lib/auth"
 
 interface LoginPageProps {
   onLoginSuccess: () => void
@@ -16,31 +18,36 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const handleCustomLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-    // Simulate login
-    setTimeout(() => {
-      onLoginSuccess()
+    setError(null)
+    try {
+      const response = await authApi.login({ email, password })
+      if (response.success && response.data?.access_token) {
+        markAuthenticated()
+        onLoginSuccess()
+      } else {
+        setError("Login failed. Please check your credentials.")
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Login failed. Please try again."
+      setError(message)
+    } finally {
       setIsLoading(false)
-    }, 1000)
+    }
   }
 
+  // OAuth logins are not yet wired to a backend OAuth flow;
+  // they fall through to a "not supported" notice for now.
   const handleGoogleLogin = () => {
-    setIsLoading(true)
-    setTimeout(() => {
-      onLoginSuccess()
-      setIsLoading(false)
-    }, 1500)
+    setError("Google sign-in is not yet configured.")
   }
 
   const handleMicrosoftLogin = () => {
-    setIsLoading(true)
-    setTimeout(() => {
-      onLoginSuccess()
-      setIsLoading(false)
-    }, 1500)
+    setError("Microsoft sign-in is not yet configured.")
   }
 
   return (
@@ -95,6 +102,13 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
             <span className="text-xs text-muted-foreground font-medium">OR</span>
             <div className="flex-1 h-px bg-gradient-to-l from-transparent to-white/10" />
           </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-sm text-red-300">
+              {error}
+            </div>
+          )}
 
           {/* Custom Login Form */}
           <form onSubmit={handleCustomLogin} className="space-y-4">
@@ -162,7 +176,31 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
           <div className="text-center">
             <p className="text-sm text-muted-foreground">
               Don't have an account?{" "}
-              <button className="text-pink-400 hover:text-pink-300 font-semibold transition-colors">Sign up</button>
+              <button
+                type="button"
+                disabled={isLoading || !email || !password}
+                onClick={async () => {
+                  setIsLoading(true)
+                  setError(null)
+                  try {
+                    await authApi.register({ email, password })
+                    // After registration, log in immediately
+                    const response = await authApi.login({ email, password })
+                    if (response.success && response.data?.access_token) {
+                      markAuthenticated()
+                      onLoginSuccess()
+                    }
+                  } catch (err: unknown) {
+                    const message = err instanceof Error ? err.message : "Registration failed."
+                    setError(message)
+                  } finally {
+                    setIsLoading(false)
+                  }
+                }}
+                className="text-pink-400 hover:text-pink-300 font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Sign up
+              </button>
             </p>
           </div>
         </div>

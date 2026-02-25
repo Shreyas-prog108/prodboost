@@ -10,8 +10,8 @@ venv/
 .venv/
 env/
 
-# Environment & secrets
-.env
+# Environment & secrets — match all variants (.env, .env.local, .env.production, etc.)
+.env*
 
 # Database
 *.db

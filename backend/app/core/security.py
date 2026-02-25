@@ -5,7 +5,8 @@ from jwt import encode, decode, PyJWTError
 from cryptography.fernet import Fernet
 import base64
 import hashlib
-from fastapi import Depends, HTTPException, status
+import uuid
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -16,10 +17,12 @@ from app.models.user import User
 from app.schemas.token import TokenData
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+# tokenUrl is used only for OpenAPI docs; actual token extraction is handled manually below.
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login", auto_error=False)
 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
+COOKIE_NAME = "access_token"
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -32,39 +35,96 @@ def get_password_hash(password: str) -> str:
 
 def create_access_token(subject: str | Any, role: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode = {"exp": expire, "sub": str(subject), "role": role}
+    jti = str(uuid.uuid4())  # unique token ID — used for revocation
+    to_encode = {"exp": expire, "sub": str(subject), "role": role, "jti": jti}
     encoded_jwt = encode(to_encode, settings.JWT_SECRET, algorithm=ALGORITHM)
     return encoded_jwt
 
 
+# ── Token revocation (Redis blocklist) ──────────────────────────────────────
+
+def _get_blocklist_client():
+    """Lazy-import to avoid circular dependencies."""
+    from app.core.redis import redis_client as upstash_client
+    return upstash_client
+
+
+def revoke_token(jti: str, exp: int) -> None:
+    """Add a token JTI to the Redis blocklist until its natural expiry."""
+    import logging
+    now = int(datetime.now(timezone.utc).timestamp())
+    ttl = max(exp - now, 1)
+    try:
+        _get_blocklist_client().set(f"blocklist:{jti}", "1", ex=ttl)
+    except Exception as e:
+        logging.getLogger(__name__).error(f"Failed to revoke token JTI {jti}: {e}")
+
+
+def is_token_revoked(jti: str) -> bool:
+    """Return True if the token has been revoked."""
+    import logging
+    try:
+        return bool(_get_blocklist_client().get(f"blocklist:{jti}"))
+    except Exception as e:
+        # Fail closed: if Redis is down we cannot verify revocation, deny access.
+        logging.getLogger(__name__).error(f"Blocklist check failed for JTI {jti}: {e}")
+        return True
+
+
+# ── Auth dependency ──────────────────────────────────────────────────────────
+
+def _extract_raw_token(request: Request, bearer_token: str | None) -> str | None:
+    """
+    Extract the raw JWT string from either:
+    1. The HttpOnly cookie (preferred for browser clients), or
+    2. The Authorization: Bearer header (for API / mobile clients).
+    """
+    cookie_token = request.cookies.get(COOKIE_NAME)
+    if cookie_token:
+        return cookie_token
+    return bearer_token  # may be None
+
+
 async def get_current_user(
-    token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)
+    request: Request,
+    bearer_token: str | None = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_db),
 ) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+    token = _extract_raw_token(request, bearer_token)
+    if not token:
+        raise credentials_exception
+
     try:
         payload = decode(token, settings.JWT_SECRET, algorithms=[ALGORITHM])
         user_id: str = payload.get("sub")
-        if user_id is None:
+        jti: str = payload.get("jti")
+        if user_id is None or jti is None:
             raise credentials_exception
         token_data = TokenData(user_id=user_id)
     except PyJWTError:
         raise credentials_exception
-        
+
+    # Revocation check
+    if is_token_revoked(jti):
+        raise credentials_exception
+
     stmt = select(User).where(User.id == token_data.user_id)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
-    
+
     if user is None:
         raise credentials_exception
-        
+
     return user
 
 
-# --- Token Encryption Methods ---
+# ── Token Encryption Methods ─────────────────────────────────────────────────
 
 def _get_fernet() -> Fernet:
     """

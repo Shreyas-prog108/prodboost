@@ -13,21 +13,10 @@ import {
   Share2,
   BookOpen,
   Lightbulb,
+  Upload,
+  X,
 } from "lucide-react"
-
-interface MeetingData {
-  id: string
-  title: string
-  time: string
-  duration: number
-  location: string
-  organizer: string
-  attendees: Array<{ name: string; role: string; avatar: string }>
-  agenda: string
-  objective: string
-  relatedEmails: number
-  attachments: string[]
-}
+import { meetingsApi, type Meeting } from "@/lib/api"
 
 interface PrepItem {
   id: string
@@ -37,12 +26,62 @@ interface PrepItem {
   importance: "high" | "medium" | "low"
 }
 
-export function MeetingPrepAssistant() {
-  const [selectedMeeting, setSelectedMeeting] = useState(0)
+// Static prep items (AI-generated content from backend would populate these in future)
+const DEFAULT_PREP_ITEMS: PrepItem[] = [
+  {
+    id: "1",
+    category: "context",
+    title: "Previous Meeting Outcomes",
+    content:
+      "Last board meeting resulted in approval for market expansion. Board requested detailed implementation timeline by end of Q3.",
+    importance: "high",
+  },
+  {
+    id: "2",
+    category: "research",
+    title: "Market Analysis - Industry Trends",
+    content:
+      "Growth in AI-driven solutions expected to reach 35% CAGR. Competitors launching 3 new products this quarter.",
+    importance: "high",
+  },
+  {
+    id: "3",
+    category: "talking-points",
+    title: "Key Achievements to Highlight",
+    content:
+      "25% revenue growth YoY, expanded market share in Asia, successful product launch 2 weeks ahead of schedule",
+    importance: "high",
+  },
+  {
+    id: "4",
+    category: "questions",
+    title: "Potential Board Questions",
+    content:
+      "What are the risks of rapid expansion? How will we handle increased competition? What's the timeline for profitability?",
+    importance: "medium",
+  },
+]
 
-  const meetings: MeetingData[] = [
+export function MeetingPrepAssistant() {
+  // ── Upload state ──────────────────────────────────────────────────────────
+  const [showUpload, setShowUpload] = useState(false)
+  const [uploadTitle, setUploadTitle] = useState("")
+  const [uploadTranscript, setUploadTranscript] = useState("")
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [uploadedMeetings, setUploadedMeetings] = useState<Meeting[]>([])
+
+  // ── Summarize state ───────────────────────────────────────────────────────
+  const [summarizingId, setSummarizingId] = useState<string | null>(null)
+  const [summarizeMessage, setSummarizeMessage] = useState<string | null>(null)
+
+  // ── Prep view selection ───────────────────────────────────────────────────
+  const [selectedMeetingIdx, setSelectedMeetingIdx] = useState(0)
+
+  // Static fallback meetings for display when no real meetings have been uploaded
+  const staticMeetings = [
     {
-      id: "1",
+      id: "static-1",
       title: "Q4 Strategic Review with Board",
       time: "2:00 PM",
       duration: 90,
@@ -59,7 +98,7 @@ export function MeetingPrepAssistant() {
       attachments: ["Q4_Financial_Report.pdf", "Strategic_Proposal.docx"],
     },
     {
-      id: "2",
+      id: "static-2",
       title: "Product Roadmap Sync",
       time: "3:30 PM",
       duration: 60,
@@ -76,58 +115,44 @@ export function MeetingPrepAssistant() {
     },
   ]
 
-  const currentMeeting = meetings[selectedMeeting]
+  const handleUpload = async () => {
+    if (!uploadTitle.trim() || !uploadTranscript.trim()) return
+    setIsUploading(true)
+    setUploadError(null)
+    try {
+      const response = await meetingsApi.upload({
+        title: uploadTitle.trim(),
+        transcript: uploadTranscript.trim(),
+      })
+      if (response.success) {
+        setUploadedMeetings((prev) => [response.data, ...prev])
+        setUploadTitle("")
+        setUploadTranscript("")
+        setShowUpload(false)
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Upload failed"
+      setUploadError(message)
+    } finally {
+      setIsUploading(false)
+    }
+  }
 
-  const prepItems: PrepItem[] = [
-    {
-      id: "1",
-      category: "context",
-      title: "Previous Meeting Outcomes",
-      content:
-        "Last board meeting resulted in approval for market expansion. Board requested detailed implementation timeline by end of Q3.",
-      importance: "high",
-    },
-    {
-      id: "2",
-      category: "research",
-      title: "Market Analysis - Industry Trends",
-      content:
-        "Growth in AI-driven solutions expected to reach 35% CAGR. Competitors launching 3 new products this quarter.",
-      importance: "high",
-    },
-    {
-      id: "3",
-      category: "talking-points",
-      title: "Key Achievements to Highlight",
-      content:
-        "25% revenue growth YoY, expanded market share in Asia, successful product launch 2 weeks ahead of schedule",
-      importance: "high",
-    },
-    {
-      id: "4",
-      category: "questions",
-      title: "Potential Board Questions",
-      content:
-        "What are the risks of rapid expansion? How will we handle increased competition? What's the timeline for profitability?",
-      importance: "medium",
-    },
-    {
-      id: "5",
-      category: "research",
-      title: "Competitor Intelligence",
-      content:
-        "Main competitor increased pricing by 12%. New market entrant with aggressive strategy identified in Southeast Asia.",
-      importance: "medium",
-    },
-    {
-      id: "6",
-      category: "talking-points",
-      title: "Budget Justification",
-      content:
-        "Investment of $5M required for infrastructure. Expected ROI of 300% within 18 months. Funding sources identified.",
-      importance: "high",
-    },
-  ]
+  const handleSummarize = async (meetingId: string) => {
+    setSummarizingId(meetingId)
+    setSummarizeMessage(null)
+    try {
+      const response = await meetingsApi.summarize(meetingId)
+      if (response.success) {
+        setSummarizeMessage(`Summarization queued (Job ID: ${response.data.job_id})`)
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to queue summarization"
+      setSummarizeMessage(message)
+    } finally {
+      setSummarizingId(null)
+    }
+  }
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
@@ -172,25 +197,116 @@ export function MeetingPrepAssistant() {
     }
   }
 
+  const currentMeeting = staticMeetings[selectedMeetingIdx]
+
   return (
     <div className="w-full min-h-screen bg-gradient-to-br from-slate-950 via-purple-950/50 to-slate-950 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-4xl font-bold text-foreground mb-2">Meeting Preparation Assistant</h1>
-          <p className="text-muted-foreground">AI-curated insights and talking points for your upcoming meetings</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-4xl font-bold text-foreground mb-2">Meeting Preparation Assistant</h1>
+            <p className="text-muted-foreground">AI-curated insights and talking points for your upcoming meetings</p>
+          </div>
+          <button
+            onClick={() => setShowUpload((v) => !v)}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-cyan-500 hover:from-purple-600 hover:to-cyan-600 rounded-lg text-white font-medium transition-all"
+          >
+            <Upload className="w-4 h-4" />
+            Upload Transcript
+          </button>
         </div>
+
+        {/* Upload Panel */}
+        {showUpload && (
+          <div className="glass rounded-lg p-6 border border-purple-500/30 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-foreground">Upload Meeting Transcript</h2>
+              <button
+                onClick={() => setShowUpload(false)}
+                className="p-1 hover:bg-white/10 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-muted-foreground" />
+              </button>
+            </div>
+            {uploadError && (
+              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-sm">
+                {uploadError}
+              </div>
+            )}
+            <div>
+              <label className="text-sm text-muted-foreground block mb-1">Meeting Title</label>
+              <input
+                type="text"
+                value={uploadTitle}
+                onChange={(e) => setUploadTitle(e.target.value)}
+                placeholder="e.g. Q4 Board Review"
+                className="w-full px-3 py-2 glass rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground block mb-1">Transcript</label>
+              <textarea
+                value={uploadTranscript}
+                onChange={(e) => setUploadTranscript(e.target.value)}
+                placeholder="Paste the meeting transcript here..."
+                rows={6}
+                className="w-full px-3 py-2 glass rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-sm resize-none"
+              />
+            </div>
+            <button
+              onClick={handleUpload}
+              disabled={isUploading || !uploadTitle.trim() || !uploadTranscript.trim()}
+              className="px-6 py-2 bg-gradient-to-r from-purple-500 to-cyan-500 hover:from-purple-600 hover:to-cyan-600 rounded-lg text-white font-medium transition-all disabled:opacity-50"
+            >
+              {isUploading ? "Uploading..." : "Upload"}
+            </button>
+          </div>
+        )}
+
+        {/* Uploaded Meetings (from API) */}
+        {uploadedMeetings.length > 0 && (
+          <div className="glass rounded-lg p-6 border border-white/10 space-y-3">
+            <h2 className="text-lg font-semibold text-foreground">Your Uploaded Meetings</h2>
+            {summarizeMessage && (
+              <div className="p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-sm">
+                {summarizeMessage}
+              </div>
+            )}
+            {uploadedMeetings.map((m) => (
+              <div key={m.id} className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10">
+                <div>
+                  <p className="font-medium text-foreground">{m.title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Status: <span className="capitalize">{m.status.toLowerCase()}</span>
+                    {m.summary && " · Summary available"}
+                  </p>
+                  {m.summary && (
+                    <p className="text-xs text-cyan-300 mt-1 max-w-xl truncate">{m.summary}</p>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleSummarize(m.id)}
+                  disabled={summarizingId === m.id}
+                  className="px-3 py-1 glass hover:bg-white/10 rounded-lg text-sm text-foreground transition-colors disabled:opacity-50"
+                >
+                  {summarizingId === m.id ? "Queuing..." : "Summarize"}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Meeting List Sidebar */}
           <div className="lg:col-span-1 space-y-3">
             <h2 className="text-lg font-semibold text-foreground">Upcoming Meetings</h2>
-            {meetings.map((meeting, idx) => (
+            {staticMeetings.map((meeting, idx) => (
               <button
                 key={meeting.id}
-                onClick={() => setSelectedMeeting(idx)}
+                onClick={() => setSelectedMeetingIdx(idx)}
                 className={`w-full text-left p-4 rounded-lg transition-all border ${
-                  selectedMeeting === idx
+                  selectedMeetingIdx === idx
                     ? "glass bg-purple-500/20 border-purple-500/50"
                     : "glass border-white/10 hover:bg-white/5"
                 }`}
@@ -198,7 +314,7 @@ export function MeetingPrepAssistant() {
                 <p className="font-semibold text-foreground text-sm mb-1">{meeting.title}</p>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Clock className="w-3 h-3" />
-                  {meeting.time} • {meeting.duration}m
+                  {meeting.time} · {meeting.duration}m
                 </div>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
                   <MapPin className="w-3 h-3" />
@@ -299,7 +415,7 @@ export function MeetingPrepAssistant() {
             {/* Prep Items */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-foreground">Curated Preparation Materials</h3>
-              {prepItems.map((item) => (
+              {DEFAULT_PREP_ITEMS.map((item) => (
                 <div
                   key={item.id}
                   className={`glass rounded-lg p-4 border transition-all ${getImportanceColor(item.importance)}`}

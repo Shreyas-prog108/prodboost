@@ -1,6 +1,6 @@
 import uuid
 import enum
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import String, Boolean, DateTime, ForeignKey, Enum, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -23,4 +23,4 @@ class AutomationRule(Base):
     # The action logic to execute. E.g., {"type": "CREATE_TASK", "assignee": "me"}
     action_json: Mapped[dict] = mapped_column(JSON, default=lambda: {}, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.utcnow(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)

@@ -1,0 +1,28 @@
+# Backend Python dependencies
+# Install with: pip install -r requirements.txt
+
+# Web framework
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+
+# Database
+sqlalchemy>=2.0.29
+asyncpg>=0.29.0
+alembic>=1.13.1
+
+# Settings & validation
+pydantic>=2.7.0
+pydantic-settings>=2.2.1
+pydantic[email]
+
+# Auth & security
+PyJWT>=2.8.0
+passlib[bcrypt]>=1.7.4
+cryptography>=42.0.0
+
+# Redis clients
+upstash-redis>=1.1.0       # Upstash REST client (rate limiting + token blocklist)
+redis[asyncio]>=5.0.3      # Standard async client (background job queue)
+
+# HTTP utilities
+httpx>=0.27.0              # Used by some AI provider clients
