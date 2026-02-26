@@ -27,21 +27,29 @@ async def get_tasks_service(user_id: str, db: AsyncSession) -> list[Task]:
     return tasks
 
 
-async def update_task_service(task_id: str, task_in: TaskUpdate, db: AsyncSession) -> Task:
-    stmt = select(Task).where(Task.id == task_id)
+async def update_task_service(task_id: str, user_id: str, task_in: TaskUpdate, db: AsyncSession) -> Task:
+    # Single query: fetch only if the task exists AND belongs to this user.
+    stmt = select(Task).where(Task.id == task_id, Task.user_id == user_id)
     result = await db.execute(stmt)
     task = result.scalar_one_or_none()
-    
+
     if not task:
+        # Distinguish "not found" from "belongs to someone else" for correct HTTP status.
+        exists_result = await db.execute(select(Task.id).where(Task.id == task_id))
+        if exists_result.scalar_one_or_none() is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Task not found"
+            )
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Task not found"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to update this task"
         )
-        
+
     update_data = task_in.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(task, key, value)
-        
+
     await db.commit()
     await db.refresh(task)
     return task

@@ -51,7 +51,12 @@ async def update_knowledge(
     current_user: User = Depends(get_current_user)
 ):
     """Update a knowledge article. Automatically increments the version number on change.
-    Only the team owner may update entries."""
+
+    Security note: This endpoint enforces authentication via JWT but does NOT enforce
+    per-entry or team-membership authorization. Any authenticated user who knows a valid
+    entry ID may be able to update it until a TeamMember join table and corresponding
+    authorization checks are implemented in the schema and service layer.
+    """
     entry = await update_knowledge_service(id, entry_in, current_user.id, db)
     return APIResponse(data=entry)
 

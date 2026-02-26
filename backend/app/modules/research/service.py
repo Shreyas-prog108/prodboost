@@ -25,20 +25,10 @@ async def get_user_projects_service(user_id: str, db: AsyncSession) -> list[Rese
     return projects
 
 
-async def add_source_to_project_service(project_id: str, source_in: SourceCreate, db: AsyncSession) -> Source:
-    # Basic check to ensure project exists
-    stmt = select(ResearchProject).where(ResearchProject.id == project_id)
-    result = await db.execute(stmt)
-    project = result.scalar_one_or_none()
-    
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Research project not found"
-        )
-        
+async def add_source_to_project_service(project: ResearchProject, source_in: SourceCreate, db: AsyncSession) -> Source:
+    """Add a source to an already-fetched and ownership-verified project."""
     new_source = Source(
-        project_id=project_id,
+        project_id=project.id,
         url=source_in.url,
         title=source_in.title,
         metadata_json=source_in.metadata_json,
@@ -51,20 +41,10 @@ async def add_source_to_project_service(project_id: str, source_in: SourceCreate
     return new_source
 
 
-async def add_note_to_project_service(project_id: str, note_in: NoteCreate, db: AsyncSession) -> Note:
-    # Basic check to ensure project exists
-    stmt = select(ResearchProject).where(ResearchProject.id == project_id)
-    result = await db.execute(stmt)
-    project = result.scalar_one_or_none()
-    
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Research project not found"
-        )
-        
+async def add_note_to_project_service(project: ResearchProject, note_in: NoteCreate, db: AsyncSession) -> Note:
+    """Add a note to an already-fetched and ownership-verified project."""
     new_note = Note(
-        project_id=project_id,
+        project_id=project.id,
         content=note_in.content,
         tags=note_in.tags,
         linked_source_id=note_in.linked_source_id
@@ -91,3 +71,4 @@ async def get_project_context(project_id: str, db: AsyncSession) -> dict:
         "sources_data": [{"id": s.id, "title": s.title} for s in sources],
         "notes_data": [{"id": n.id, "content": n.content} for n in notes]
     }
+

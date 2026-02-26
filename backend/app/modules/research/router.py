@@ -67,8 +67,9 @@ async def add_source(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    await _get_project_and_verify_owner(id, current_user.id, db)
-    source = await add_source_to_project_service(id, source_in, db)
+    # Single DB lookup: fetch + verify ownership, then pass the project to the service.
+    project = await _get_project_and_verify_owner(id, current_user.id, db)
+    source = await add_source_to_project_service(project, source_in, db)
     return APIResponse(data=source)
 
 
@@ -79,8 +80,9 @@ async def add_note(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    await _get_project_and_verify_owner(id, current_user.id, db)
-    note = await add_note_to_project_service(id, note_in, db)
+    # Single DB lookup: fetch + verify ownership, then pass the project to the service.
+    project = await _get_project_and_verify_owner(id, current_user.id, db)
+    note = await add_note_to_project_service(project, note_in, db)
     return APIResponse(data=note)
 
 

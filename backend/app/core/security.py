@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any
+import logging
 from passlib.context import CryptContext
 from jwt import encode, decode, PyJWTError
 from cryptography.fernet import Fernet
@@ -15,6 +16,8 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.models.user import User
 from app.schemas.token import TokenData
+
+logger = logging.getLogger(__name__)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # tokenUrl is used only for OpenAPI docs; actual token extraction is handled manually below.
@@ -51,23 +54,21 @@ def _get_blocklist_client():
 
 def revoke_token(jti: str, exp: int) -> None:
     """Add a token JTI to the Redis blocklist until its natural expiry."""
-    import logging
     now = int(datetime.now(timezone.utc).timestamp())
     ttl = max(exp - now, 1)
     try:
         _get_blocklist_client().set(f"blocklist:{jti}", "1", ex=ttl)
     except Exception as e:
-        logging.getLogger(__name__).error(f"Failed to revoke token JTI {jti}: {e}")
+        logger.error(f"Failed to revoke token JTI {jti}: {e}")
 
 
 def is_token_revoked(jti: str) -> bool:
     """Return True if the token has been revoked."""
-    import logging
     try:
         return bool(_get_blocklist_client().get(f"blocklist:{jti}"))
     except Exception as e:
         # Fail closed: if Redis is down we cannot verify revocation, deny access.
-        logging.getLogger(__name__).error(f"Blocklist check failed for JTI {jti}: {e}")
+        logger.error(f"Blocklist check failed for JTI {jti}: {e}")
         return True
 
 
@@ -138,8 +139,7 @@ def _get_fernet() -> Fernet:
 def encrypt_token(token: str) -> str:
     """Encrypts a plaintext string (e.g. an OAuth access token) symmetrically."""
     if not token:
-        import logging
-        logging.getLogger(__name__).warning(
+        logger.warning(
             "encrypt_token called with an empty token value — this may indicate a bug in the caller."
         )
         return ""
@@ -150,8 +150,7 @@ def encrypt_token(token: str) -> str:
 def decrypt_token(encrypted_token: str) -> str:
     """Decrypts strings previously encrypted via encrypt_token."""
     if not encrypted_token:
-        import logging
-        logging.getLogger(__name__).warning(
+        logger.warning(
             "decrypt_token called with an empty encrypted_token — this may indicate a bug in the caller."
         )
         return ""

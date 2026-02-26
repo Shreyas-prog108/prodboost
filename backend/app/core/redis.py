@@ -33,7 +33,8 @@ def check_rate_limit(key: str, limit: int = 5, window: int = 60):
         raise
     except Exception as e:
         logging.getLogger(__name__).error(
-            f"Rate limit check failed (Redis error) for key '{key}': {e}"
+            f"Rate limit check failed (Redis error) for key '{key}': {e}",
+            exc_info=True,
         )
         # Fail closed: block the request when we cannot verify the rate limit.
         # This prevents a Redis outage from silently disabling all auth protection.
